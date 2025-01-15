@@ -1,4 +1,4 @@
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import {
   WebSocketGateway,
   WebSocketServer,
@@ -33,18 +33,7 @@ export class LocationGateway implements OnGatewayConnection, OnGatewayDisconnect
     summary: 'Receive and Broadcast Location Updates',
     description: 'This event listens to updates from clients and broadcasts the location to all connected clients.',
   })
-  @ApiResponse({
-    status: 200,
-    description: 'Location update received and broadcasted.',
-    type: Object,
-    schema: {
-      example: {
-        userId: 'user123',
-        latitude: 37.7749,
-        longitude: -122.4194,
-      },
-    },
-  })
+ 
   handleLocationUpdate(
     @MessageBody() data: { userId: string; latitude: number; longitude: number },
     @ConnectedSocket() client: Socket,
