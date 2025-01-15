@@ -1,54 +1,71 @@
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import {
-    WebSocketGateway,
-    WebSocketServer,
-    SubscribeMessage,
-    MessageBody,
-    ConnectedSocket,
-    OnGatewayConnection,
-    OnGatewayDisconnect,
-  } from '@nestjs/websockets';
-  import { Server, Socket } from 'socket.io';
-  
-  @WebSocketGateway({ cors: true }) // Enable WebSocket Gateway with CORS support
-  export class LocationGateway implements OnGatewayConnection, OnGatewayDisconnect {
-    // @WebSocketServer decorates the server instance for broadcasting messages
-    @WebSocketServer()
-    server: Server;
-  
-    // A map to track active users, where the key is the socket ID, and the value is the socket instance
-    private activeUsers = new Map<string, Socket>();
-  
-    /**
-     * Handle new client connections
-     * This method is called automatically when a client connects to the WebSocket server.
-     */
-    handleConnection(client: Socket) {
-      console.log(`Client connected: ${client.id}`); // Log the connection
-      this.activeUsers.set(client.id, client); // Add the connected client to the active users map
-    }
-  
-    /**
-     * Handle client disconnections
-     * This method is triggered when a client disconnects from the server.
-     */
-    handleDisconnect(client: Socket) {
-      console.log(`Client disconnected: ${client.id}`); // Log the disconnection
-      this.activeUsers.delete(client.id); // Remove the client from the active users map
-    }
-  
-    /**
-     * Handle location updates from clients
-     * This method listens for the "updateLocation" event from connected clients.
-     */
-    @SubscribeMessage('updateLocation')
-    handleLocationUpdate(
-      @MessageBody() data: { userId: string; latitude: number; longitude: number }, // The location data sent by the client
-      @ConnectedSocket() _client: Socket, // The socket instance of the client that sent the event (marked as unused here)
-    ) {
-      console.log(`Received location from user ${data.userId}:`, data);
-  
-      // Broadcast the location update to all connected clients
-      this.server.emit('locationUpdate', data);
-    }
+  WebSocketGateway,
+  WebSocketServer,
+  SubscribeMessage,
+  MessageBody,
+  ConnectedSocket,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+} from '@nestjs/websockets';
+import { Server, Socket } from 'socket.io';
+
+@ApiTags('Location') // Group this endpoint under "Location" in Swagger UI
+@WebSocketGateway({ cors: true }) // Enable WebSocket Gateway with CORS support
+export class LocationGateway implements OnGatewayConnection, OnGatewayDisconnect {
+  @WebSocketServer()
+  server: Server;
+
+  private activeUsers = new Map<string, Socket>();
+
+  /**
+   * Handle new client connections
+   */
+  handleConnection(client: Socket): void {
+    console.log(`Client connected: ${client.id}`);
+    this.activeUsers.set(client.id, client);
   }
-  
+
+  /**
+   * Handle client disconnections
+   */
+  handleDisconnect(client: Socket): void {
+    console.log(`Client disconnected: ${client.id}`);
+    this.activeUsers.delete(client.id);
+  }
+
+  /**
+   * Handle location updates from clients
+   * @param data { userId: string, latitude: number, longitude: number }
+   */
+  @SubscribeMessage('updateLocation')
+  @ApiOperation({
+    summary: 'Receive location updates from clients',
+    description: 'Handles location updates sent by clients to be broadcast to all connected users.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Location update received and broadcasted to all clients.',
+    type: Object,
+    isArray: false,
+    schema: {
+      example: {
+        userId: 'user123',
+        latitude: 37.7749,
+        longitude: -122.4194,
+      },
+    },
+  })
+  handleLocationUpdate(
+    @MessageBody() data: { userId: string; latitude: number; longitude: number },
+    @ConnectedSocket() client: Socket, // Explicitly mark it as used
+  ): void {
+    console.log(`Received location from user ${data.userId}:`, data);
+
+    // Optional: Send an acknowledgment back to the sender
+    client.emit('locationReceived', { status: 'success', receivedData: data });
+
+    // Broadcast the location update to all connected clients
+    this.server.emit('locationUpdate', data);
+  }
+}
